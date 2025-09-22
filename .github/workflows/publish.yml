@@ -83,28 +83,25 @@ jobs:
   build-scepserver:
     name: Build & push scepserver
     runs-on: ubuntu-latest
-
+  
     permissions:
       contents: read
       packages: write
-
+  
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
+  
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
+  
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
+  
       - name: Compute tags
         id: meta
         run: |
@@ -116,13 +113,14 @@ jobs:
           else
             REF_TAG="${IMAGE}:latest"
           fi
-          echo "image=${IMAGE}"           >> $GITHUB_OUTPUT
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
           echo "tags=${SHA_TAG},${REF_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Build & push (amd64)
+  
+      - name: Build & push from upstream Zentral
         uses: docker/build-push-action@v6
         with:
-          context: .
+          # Use the upstream repo/ref that has the Dockerfile path below
+          context: https://github.com/zentralopensource/zentral.git#main
           file: conf/common/docker/scepserver/Dockerfile
           push: true
           platforms: linux/amd64
