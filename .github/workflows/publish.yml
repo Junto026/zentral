@@ -116,14 +116,16 @@ jobs:
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
           echo "tags=${SHA_TAG},${REF_TAG}" >> $GITHUB_OUTPUT
   
-      - name: Build & push from upstream Zentral
+      - name: Build & push from upstream Zentral (scepserver)
         uses: docker/build-push-action@v6
         with:
-          # Use the upstream repo/ref that has the Dockerfile path below
-          context: https://github.com/zentralopensource/zentral.git#main
-          file: conf/common/docker/scepserver/Dockerfile
+          # NOTE: context points to the subdir that contains Dockerfile + openssl.conf + entrypoint
+          # Syntax: https://github.com/ORG/REPO.git#REF:SUBDIR
+          context: https://github.com/zentralopensource/zentral.git#main:conf/common/docker/scepserver
+          file: Dockerfile
           push: true
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
           cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
+
