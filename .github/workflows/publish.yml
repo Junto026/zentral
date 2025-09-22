@@ -80,3 +80,52 @@ jobs:
             ${{ env.GHCR_IMAGE }}:${{ steps.latest.outputs.tag }}
             ${{ env.GHCR_IMAGE }}:latest
           provenance: false
+  build-scepserver:
+    name: Build & push scepserver
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER_LC}/zentral-scepserver"
+          SHA_TAG="${IMAGE}:sha-${GITHUB_SHA::7}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            REF_TAG="${IMAGE}:${GITHUB_REF_NAME}"
+          else
+            REF_TAG="${IMAGE}:latest"
+          fi
+          echo "image=${IMAGE}"           >> $GITHUB_OUTPUT
+          echo "tags=${SHA_TAG},${REF_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build & push (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: conf/common/docker/scepserver/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
+          cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
