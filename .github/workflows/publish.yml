@@ -3,9 +3,9 @@ name: Build & Publish Zentral to GHCR
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 1 * * *"   
+    - cron: "0 1 * * *"
 
-# Keep default token minimal; the job will request only what it needs.
+# Keep default token minimal; jobs can request more where needed.
 permissions:
   contents: read
   packages: write
@@ -22,7 +22,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    steps:        
+    steps:
       - name: Determine latest upstream tag
         id: latest
         run: |
@@ -76,21 +76,22 @@ jobs:
             ${{ env.GHCR_IMAGE }}:${{ steps.latest.outputs.tag }}
             ${{ env.GHCR_IMAGE }}:latest
           provenance: false
+
   build-scepserver:
     name: Build & push scepserver
     runs-on: ubuntu-latest
-  
+
     permissions:
       contents: read
       packages: write
-  
+
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-  
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-  
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -117,7 +118,6 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Latest upstream tag: $TAG"
 
-  
       - name: Compute tags
         id: meta
         run: |
@@ -130,7 +130,7 @@ jobs:
         id: scep_exist
         continue-on-error: true
         run: docker manifest inspect "${{ env.GHCR_IMAGE_SCEP }}:${{ steps.latest.outputs.tag }}"
-  
+
       - name: Build & push from upstream Zentral (scepserver)
         if: steps.scep_exist.outcome != 'success'
         uses: docker/build-push-action@v6
@@ -143,3 +143,16 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
           cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
+
+  keepalive:
+    name: Keep Zentral workflow alive
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write       # needed so the action can ping/enable workflows
+      contents: read       # needed for checkout
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Keep scheduled workflow active
+        uses: gautamkrishnar/keepalive-workflow@v2
