@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "0 1 * * *"
 
-# Keep default token minimal; jobs can request more where needed.
+# Default: keep token minimal for build jobs
 permissions:
   contents: read
   packages: write
@@ -19,6 +19,23 @@ env:
   GHCR_IMAGE_SCEP: ghcr.io/junto026/zentral-scepserver
 
 jobs:
+  # --- NEW: keep the repo "active" so the scheduled workflow is not auto-disabled ---
+  keepalive:
+    # Only bother on the cron schedule, not on manual dispatch
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # <-- this is what fixes "Repository access blocked"
+
+    steps:
+      - name: Keep Zentral workflow alive
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          # 60 days is the auto-disable window; 50 gives you buffer
+          time_until_inactive: 50
+          # Explicitly target this repo
+          repo: ${{ github.repository }}
+
   build:
     runs-on: ubuntu-latest
 
@@ -135,7 +152,6 @@ jobs:
         if: steps.scep_exist.outcome != 'success'
         uses: docker/build-push-action@v6
         with:
-          # Use the upstream tag, not main
           context: https://github.com/zentralopensource/zentral.git#${{ steps.latest.outputs.tag }}:conf/common/docker/scepserver
           file: Dockerfile
           push: true
@@ -143,16 +159,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
           cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
-
-  keepalive:
-    name: Keep Zentral workflow alive
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write       # needed so the action can ping/enable workflows
-      contents: read       # needed for checkout
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Keep scheduled workflow active
-        uses: gautamkrishnar/keepalive-workflow@v2
