@@ -19,22 +19,32 @@ env:
   GHCR_IMAGE_SCEP: ghcr.io/junto026/zentral-scepserver
 
 jobs:
-  # --- NEW: keep the repo "active" so the scheduled workflow is not auto-disabled ---
+  # --- Keep the repo "active" so scheduled workflow is not auto-disabled ---
   keepalive:
-    # Only bother on the cron schedule, not on manual dispatch
+    # Only run this on the cron schedule, not on manual dispatch
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # <-- this is what fixes "Repository access blocked"
+      contents: write   # needed to push a dummy commit
 
     steps:
-      - name: Keep Zentral workflow alive
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          # 60 days is the auto-disable window; 50 gives you buffer
-          time_until_inactive: 50
-          # Explicitly target this repo
-          repo: ${{ github.repository }}
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Update keepalive file
+        run: |
+          mkdir -p .github
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/keepalive
+
+      - name: Commit and push keepalive change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .github/keepalive
+          # If the timestamp didn’t change (very unlikely) this will no-op
+          git commit -m "chore: keepalive [skip ci]" || exit 0
+          git push
 
   build:
     runs-on: ubuntu-latest
